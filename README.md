@@ -137,43 +137,22 @@ Create `/usr/local/etc/rc.d/opndash`:
 
 ```sh
 #!/bin/sh
-#
+
 # PROVIDE: opndash
 # REQUIRE: NETWORKING
 # KEYWORD: shutdown
 
 . /etc/rc.subr
 
-name="opndash"
-rcvar="${name}_enable"
-command="/usr/home/USER/opndash/venv/bin/gunicorn"
-command_args="app:app -b 127.0.0.1:5000 -w 4 --chdir /usr/home/USER/opndash"
-pidfile="/var/run/${name}/${name}.pid"
-start_cmd="${name}_start"
-stop_cmd="${name}_stop"
-status_cmd="${name}_status"
+name=opndash
+rcvar=${name}_enable
+command=/home/USER/opndash/venv/bin/gunicorn
+command_args="app:app -b 127.0.0.1:5000 -w 4 --chdir /home/USER/opndash --pid /var/run/opndash/opndash.pid --daemon"
+pidfile=/var/run/opndash/opndash.pid
+required_dirs=/home/USER/opndash
 
-opndash_start() {
-    echo "Starting ${name}..."
-    mkdir -p /var/run/${name}
-    cd /usr/home/USER/opndash
-    /usr/home/USER/opndash/venv/bin/gunicorn app:app -b 127.0.0.1:5000 -w 4 --pid /var/run/${name}/${name}.pid
-}
-
-opndash_stop() {
-    echo "Stopping ${name}..."
-    if [ -f /var/run/${name}/${name}.pid ]; then
-        kill $(cat /var/run/${name}/${name}.pid)
-        rm -f /var/run/${name}/${name}.pid
-    fi
-}
-
-opndash_status() {
-    if [ -f /var/run/${name}/${name}.pid ]; then
-        echo "${name} is running as pid $(cat /var/run/${name}/${name}.pid)"
-    else
-        echo "${name} is not running"
-    fi
+opndash_prestart() {
+    mkdir -p /var/run/opndash
 }
 
 load_rc_config ${name}
@@ -191,6 +170,7 @@ sudo service opndash start
 **Notes:**
 - Replace `USER` with your actual username
 - Adjust paths as needed for your installation
+- Gunicorn `--daemon` flag forks to background properly
 - The script uses Gunicorn with 4 workers
 - For SSL/TLS, use a reverse proxy (see below)
 
