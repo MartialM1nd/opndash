@@ -1,0 +1,6 @@
+flask
+requests
+gunicorn
+werkzeug
+flask-session
+python-dotenv

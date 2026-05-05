@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>brassvalley.net - Network Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+            min-height: 100vh;
+            max-width: 100vw;
+            overflow-x: hidden;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        h1 { color: #00d4ff; }
+        .last-update { color: #888; font-size: 12px; }
+        .grid { display: grid; grid-template-columns: auto auto 1fr; gap: 20px; align-items: start; }
+        .card {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .card-full { grid-column: 1 / -1; }
+        h2 { color: #00d4ff; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: auto; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #2a2a4a; }
+        th { color: #00d4ff; font-weight: 600; }
+        .status-up { color: #00ff88; font-weight: bold; }
+        .status-down { color: #ff4757; font-weight: bold; }
+        .status-warning { color: #ffa502; font-weight: bold; }
+        .status-nocheck { color: #888; }
+        .active-yes { color: #00ff88; }
+        .active-no { color: #888; }
+        .traffic-in { color: #00ff88; }
+        .traffic-out { color: #ff6b6b; }
+        .error { color: #ff4757; background: #2a1a1a; padding: 10px; border-radius: 5px; margin-top: 10px; }
+        .loading { color: #888; font-style: italic; }
+        .refresh-btn {
+            background: #00d4ff;
+            color: #1a1a2e;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .refresh-btn:hover { background: #00b8e6; }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 15px;
+            width: 100%;
+        }
+        .chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.85em;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        .stream-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .stream-connected { background: #00ff88; }
+        .stream-disconnected { background: #ff4757; }
+        .health-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .health-up { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .health-down { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
+        .health-nocheck { background: rgba(136, 136, 136, 0.2); color: #888; }
+        .gateways-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        .gateway-card {
+            background: #0f1629;
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid #ff4757;
+            min-height: 120px;
+        }
+        .gateway-card.status-up { border-left-color: #00ff88; }
+        .gateway-card.status-warning { border-left-color: #ffa502; }
+        .gateway-card.color-wan2 { border-left-color: rgba(0, 212, 255, 1); border-top: 1px solid rgba(0, 212, 255, 0.2); }
+        .gateway-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .gateway-name { font-size: 1.1em; font-weight: bold; color: #eee; }
+        .gateway-ip { font-size: 0.8em; color: #888; margin-top: 2px; }
+        .gateway-status {
+            font-size: 0.85em;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .gateway-status.up { background: rgba(0,255,136,0.2); color: #00ff88; }
+        .gateway-status.down { background: rgba(255,71,87,0.2); color: #ff4757; }
+        .gateway-status.warning { background: rgba(255,165,2,0.2); color: #ffa502; }
+        .gateway-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        .gateway-metric {
+            display: flex;
+            flex-direction: column;
+        }
+        .gateway-metric-label { font-size: 0.7em; color: #888; text-transform: uppercase; }
+        .gateway-metric-value { font-size: 0.95em; color: #eee; }
+        .interfaces-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        .interface-card {
+            background: #0f1629;
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid #888;
+            min-height: 120px;
+        }
+        .interface-card.color-wan { border-left-color: rgba(0, 255, 136, 1); }
+        .interface-card.color-opt3 { border-left-color: rgba(0, 212, 255, 1); }
+        .interface-card.color-wan .traffic-in { color: rgba(0, 255, 136, 1); }
+        .interface-card.color-wan .traffic-out { color: rgba(0, 255, 136, 0.5); }
+        .interface-card.color-opt3 .traffic-in { color: rgba(0, 212, 255, 1); }
+        .interface-card.color-opt3 .traffic-out { color: rgba(0, 212, 255, 0.5); }
+        .interface-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .interface-name { font-size: 1.1em; font-weight: bold; color: #eee; }
+        .interface-device { font-size: 0.8em; color: #888; margin-top: 2px; }
+        .interface-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        .interface-stat {
+            display: flex;
+            flex-direction: column;
+        }
+        .interface-stat-label { font-size: 0.7em; color: #888; text-transform: uppercase; }
+        .interface-stat-value { font-size: 0.95em; color: #eee; }
+        #services-content table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        #services-content th, #services-content td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #2a2a4a; white-space: nowrap; }
+        #services-content th { color: #00d4ff; font-weight: 600; font-size: 0.85em; }
+        #services-content td { font-size: 0.9em; }
+        #services-content td:first-child { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+        .time-range-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .time-range-selector button {
+            padding: 6px 12px;
+            background: #16213e;
+            color: #888;
+            border: 1px solid #2a2a4a;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .time-range-selector button:hover { background: #1a2a4a; }
+        .time-range-selector button.active {
+            background: #00d4ff;
+            color: #1a1a2e;
+            border-color: #00d4ff;
+        }
+        #historyChart { height: 250px; }
+        @media (max-width: 768px) {
+            #services-content table { overflow-x: auto; display: block; }
+        }
+        @media (max-width: 1100px) {
+            body { max-width: 100vw; overflow-x: hidden; }
+            .grid { 
+                grid-template-columns: 1fr; 
+                gap: 15px;
+                max-width: 100%;
+                overflow-x: hidden;
+            }
+            .card { 
+                max-width: 100%; 
+                overflow: hidden;
+                box-sizing: border-box;
+            }
+            .gateways-grid { grid-template-columns: 1fr; }
+            .interfaces-grid { grid-template-columns: 1fr; }
+            #services-content { overflow-x: auto; max-width: 100%; }
+            #services-content table { min-width: 500px; }
+            .chart-container { overflow-x: auto; max-width: 100%; }
+            #trafficChart, #historyChart { min-width: 500px; }
+        }
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            h1 { font-size: 0.9em; }
+            .refresh-btn { padding: 8px 14px; }
+            .card { padding: 12px; }
+            .gateway-card, .interface-card { 
+                padding: 12px; 
+                min-height: auto;
+            }
+            .gateway-name, .interface-name { font-size: 1em; }
+            .gateway-metric-label, .interface-stat-label { font-size: 0.65em; }
+            .gateway-metric-value, .interface-stat-value { font-size: 0.85em; }
+            #services-content th, #services-content td { 
+                padding: 4px 6px; 
+                font-size: 0.75em; 
+            }
+            #services-content th { font-size: 0.7em; }
+            .time-range-selector { gap: 8px; flex-wrap: wrap; }
+            .time-range-selector button { 
+                padding: 8px 12px; 
+                font-size: 14px;
+                min-height: 44px;
+            }
+            .chart-container { 
+                height: 200px; 
+                overflow-x: auto;
+                max-width: 100%;
+            }
+            #trafficChart, #historyChart {
+                min-width: 500px;
+            }
+            .grid { gap: 12px; }
+        }
+        @media (max-width: 450px) {
+            body { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>brassvalley.net - Network Dashboard</h1>
+        <div>
+            <span class="last-update">
+                <span id="streamStatus" class="stream-status stream-disconnected"></span>
+                <span id="lastUpdate">Connecting...</span>
+            </span>
+            <button class="refresh-btn" onclick="fetchAll()">Refresh</button>
+        </div>
+    </div>
+    
+    <div class="grid">
+        <div class="card">
+            <h2>Gateway Status</h2>
+            <div id="gateways-content"><div class="gateways-grid"><p class="loading">Loading...</p></div></div>
+        </div>
+
+        <div class="card">
+            <h2>Interface Traffic</h2>
+            <div id="traffic-content"><div class="interfaces-grid"><p class="loading">Loading...</p></div></div>
+        </div>
+
+        <div class="card">
+            <h2>Services</h2>
+            <div id="services-content"><p class="loading">Loading...</p></div>
+        </div>
+
+        <div class="card card-full">
+            <h2>Real-Time Traffic</h2>
+            <div class="chart-container">
+                <canvas id="trafficChart"></canvas>
+            </div>
+            <div class="chart-legend" id="chartLegend"></div>
+        </div>
+
+        <div class="card card-full">
+            <h2>Traffic History</h2>
+            <div class="time-range-selector">
+                <button data-range="0">1min</button>
+                <button data-range="1">5min</button>
+                <button data-range="2">1hour</button>
+                <button data-range="3">24hr</button>
+            </div>
+            <div class="chart-container">
+                <canvas id="historyChart"></canvas>
+            </div>
+            <div class="chart-legend" id="historyLegend"></div>
+        </div>
+    </div>
+
+    <script>
+        const MAX_DATA_POINTS = 60;
+        const POLL_INTERVAL = 1;
+        const REFRESH_INTERVAL = 5;
+        const interfaceOrder = ['wan', 'opt3'];
+        const interfaceNames = {
+            'wan': 'WAN',
+            'opt3': 'WAN2'
+        };
+        const interfaceColors = {
+            'wan': 'rgba(0, 255, 136, 1)',
+            'opt3': 'rgba(0, 212, 255, 1)'
+        };
+
+        let trafficChart = null;
+        let historyChart = null;
+        let historyTimestamps = [];
+        let previousBytes = {};
+        let pollTimer = null;
+        let refreshTimer = null;
+        let currentHistoryRange = '24h';
+
+        function formatBytes(bytes) {
+            if (bytes === 0 || !bytes) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatBits(bytes) {
+            if (!bytes || bytes === 0) return '0 bps';
+            const bits = Math.abs(bytes) * 8;
+            const k = 1000;
+            const sizes = ['bps', 'Kbps', 'Mbps', 'Gbps'];
+            const i = Math.floor(Math.log(bits) / Math.log(k));
+            return parseFloat((bits / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatLatency(ms) {
+            if (ms === null || ms === undefined || ms === '') return '-';
+            const val = parseFloat(ms);
+            if (isNaN(val)) return '-';
+            return val.toFixed(1) + ' ms';
+        }
+
+        function formatLoss(loss) {
+            if (loss === null || loss === undefined || loss === '') return '-';
+            const str = String(loss);
+            if (str.includes('%')) return str;
+            return str + '%';
+        }
+
+        function formatNumber(n) {
+            if (n === null || n === undefined || n === '') return '-';
+            const val = parseInt(n);
+            if (isNaN(val)) return '-';
+            if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+            if (val >= 1000) return (val / 1000).toFixed(1) + 'K';
+            return val.toString();
+        }
+
+        function formatUptime(seconds) {
+            if (seconds === null || seconds === undefined || seconds === '' || seconds === '-') return '-';
+            const val = parseFloat(seconds);
+            if (isNaN(val) || val <= 0) return '-';
+            const days = Math.floor(val / 86400);
+            const hours = Math.floor((val % 86400) / 3600);
+            const minutes = Math.floor((val % 3600) / 60);
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            return `${minutes}m`;
+        }
+
+        function initChart() {
+            const datasets = [];
+            const legendHtml = [];
+
+            interfaceOrder.forEach(key => {
+                const name = interfaceNames[key] || key;
+                const color = interfaceColors[key];
+
+                previousBytes[key] = { in: null, out: null };
+
+                datasets.push({
+                    label: `${name} In`,
+                    data: Array(MAX_DATA_POINTS).fill(0),
+                    borderColor: color,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    fill: false,
+                    key: key,
+                    direction: 'in'
+                });
+
+                datasets.push({
+                    label: `${name} Out`,
+                    data: Array(MAX_DATA_POINTS).fill(0),
+                    borderColor: color,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    tension: 0.4,
+                    pointRadius: 0,
+                    fill: false,
+                    key: key,
+                    direction: 'out'
+                });
+
+                legendHtml.push(`
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: ${color}"></div>
+                        <span>${name} In</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: ${color}; opacity: 0.6"></div>
+                        <span>${name} Out</span>
+                    </div>
+                `);
+            });
+
+            document.getElementById('chartLegend').innerHTML = legendHtml.join('');
+
+            const ctx = document.getElementById('trafficChart').getContext('2d');
+            trafficChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array(MAX_DATA_POINTS).fill(''),
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + formatBits(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            display: true,
+                            ticks: {
+                                color: '#888',
+                                font: { size: 10 },
+                                callback: function(value) {
+                                    return formatBits(value);
+                                }
+                            },
+                            grid: { color: '#2a2a4a' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initHistoryChart() {
+            const datasets = [];
+            const legendHtml = [];
+
+            interfaceOrder.forEach(key => {
+                const name = interfaceNames[key] || key;
+                const color = interfaceColors[key];
+
+                datasets.push({
+                    label: `${name} In`,
+                    data: [],
+                    borderColor: color,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    fill: false,
+                    key: key,
+                    direction: 'in'
+                });
+
+                datasets.push({
+                    label: `${name} Out`,
+                    data: [],
+                    borderColor: color,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    tension: 0.4,
+                    pointRadius: 0,
+                    fill: false,
+                    key: key,
+                    direction: 'out'
+                });
+
+                legendHtml.push(`
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: ${color}"></div>
+                        <span>${name} In</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: ${color}; opacity: 0.6"></div>
+                        <span>${name} Out</span>
+                    </div>
+                `);
+            });
+
+            document.getElementById('historyLegend').innerHTML = legendHtml.join('');
+
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            historyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const idx = context[0].dataIndex;
+                                    if (historyTimestamps && historyTimestamps[idx]) {
+                                        return new Date(historyTimestamps[idx].t).toLocaleString();
+                                    }
+                                    return '';
+                                },
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + formatBits(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            ticks: {
+                                color: '#888',
+                                font: { size: 10 },
+                                maxTicksLimit: 12
+                            },
+                            grid: { color: '#2a2a4a' }
+                        },
+                        y: {
+                            display: true,
+                            ticks: {
+                                color: '#888',
+                                font: { size: 10 },
+                                callback: function(value) {
+                                    return formatBits(value);
+                                }
+                            },
+                            grid: { color: '#2a2a4a' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function pollTraffic() {
+            try {
+                const response = await fetch('/api/traffic');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Poll error:', data.error);
+                    document.getElementById('streamStatus').className = 'stream-status stream-disconnected';
+                    return;
+                }
+
+                document.getElementById('streamStatus').className = 'stream-status stream-connected';
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+
+                const interfaces = data.interfaces || {};
+                
+                trafficChart.data.datasets.forEach(dataset => {
+                    const key = dataset.key;
+                    const direction = dataset.direction;
+                    
+                    if (interfaces[key]) {
+                        const iface = interfaces[key];
+                        const currentBytes = direction === 'in' 
+                            ? parseInt(iface['bytes received']) 
+                            : parseInt(iface['bytes transmitted']);
+                        
+                        const prev = previousBytes[key][direction];
+                        
+                        if (prev !== null) {
+                            let bytesPerSec = Math.max(0, (currentBytes - prev) / POLL_INTERVAL);
+                            if (direction === 'out') {
+                                bytesPerSec = -bytesPerSec;
+                            }
+                            dataset.data.push(bytesPerSec);
+                            dataset.data.shift();
+                        }
+                        
+                        previousBytes[key][direction] = currentBytes;
+                    }
+                });
+
+                trafficChart.update('none');
+            } catch (e) {
+                console.error('Poll error:', e);
+                document.getElementById('streamStatus').className = 'stream-status stream-disconnected';
+            }
+        }
+
+        function startPolling() {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTraffic();
+            pollTimer = setInterval(pollTraffic, POLL_INTERVAL * 1000);
+        }
+
+        async function fetchGateways() {
+            try {
+                const response = await fetch('/api/gateways');
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('gateways-content').innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                    return;
+                }
+
+                const gateways = data.rows || [];
+
+                if (gateways.length === 0) {
+                    document.getElementById('gateways-content').innerHTML = '<p class="loading">No gateways found</p>';
+                    return;
+                }
+
+                let html = '<div class="gateways-grid">';
+
+                for (const gw of gateways) {
+                    const name = gw.name || '-';
+                    const ip = gw.gateway || '-';
+                    const status = (gw.status || '').toLowerCase();
+                    const isActive = gw.defaultgw === true || gw.defaultgw === 'true' || gw.defaultgw === 1;
+                    const rtt = gw.delay || gw.latency || gw.avg_latency || null;
+                    const loss = gw.loss || null;
+
+                    let cardStatusClass = 'status-down';
+                    let badgeClass = 'down';
+                    let statusText = 'Down';
+                    if (status === 'online' || status === 'up') {
+                        cardStatusClass = 'status-up';
+                        badgeClass = 'up';
+                        statusText = 'Up';
+                    } else if (status === 'pending' || status === 'warning') {
+                        cardStatusClass = 'status-warning';
+                        badgeClass = 'warning';
+                        statusText = status.charAt(0).toUpperCase() + status.slice(1);
+                    }
+
+                    const nameLower = name.toLowerCase();
+                    const interfaceColorClass = (nameLower.includes('wan2') || nameLower.includes('opt3')) ? ' color-wan2' : '';
+
+                    html += `<div class="gateway-card ${cardStatusClass}${interfaceColorClass}">
+                        <div class="gateway-header">
+                            <div>
+                                <div class="gateway-name">${name}</div>
+                                <div class="gateway-ip">${ip}</div>
+                            </div>
+                            <span class="gateway-status ${badgeClass}">${statusText}</span>
+                        </div>
+                        <div class="gateway-metrics">
+                            <div class="gateway-metric">
+                                <span class="gateway-metric-label">Active</span>
+                                <span class="gateway-metric-value">${isActive ? 'Yes' : 'No'}</span>
+                            </div>
+                            <div class="gateway-metric">
+                                <span class="gateway-metric-label">RTT</span>
+                                <span class="gateway-metric-value">${formatLatency(rtt)}</span>
+                            </div>
+                            <div class="gateway-metric">
+                                <span class="gateway-metric-label">Loss</span>
+                                <span class="gateway-metric-value">${formatLoss(loss)}</span>
+                            </div>
+                        </div>
+                    </div>`;
+                }
+
+                html += '</div>';
+                document.getElementById('gateways-content').innerHTML = html;
+            } catch (e) {
+                document.getElementById('gateways-content').innerHTML = `<p class="error">Error: ${e.message}</p>`;
+            }
+        }
+
+        async function fetchTraffic() {
+            try {
+                const response = await fetch('/api/traffic');
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('traffic-content').innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                    return;
+                }
+
+                const interfaces = data.interfaces || {};
+                let html = '<div class="interfaces-grid">';
+                let hasInterfaces = false;
+
+                for (const key of interfaceOrder) {
+                    if (interfaces[key]) {
+                        hasInterfaces = true;
+                        const iface = interfaces[key];
+                        const name = interfaceNames[key] || iface.name || key;
+                        const inBytes = parseInt(iface['bytes received']) || 0;
+                        const outBytes = parseInt(iface['bytes transmitted']) || 0;
+                        const colorClass = `color-${key}`;
+
+                        html += `<div class="interface-card ${colorClass}">
+                            <div class="interface-header">
+                                <div>
+                                    <div class="interface-name">${name}</div>
+                                    <div class="interface-device">${iface.device || key}</div>
+                                </div>
+                            </div>
+                            <div class="interface-stats">
+                                <div class="interface-stat">
+                                    <span class="interface-stat-label">In</span>
+                                    <span class="interface-stat-value traffic-in">${formatBytes(inBytes)}</span>
+                                </div>
+                                <div class="interface-stat">
+                                    <span class="interface-stat-label">Out</span>
+                                    <span class="interface-stat-value traffic-out">${formatBytes(outBytes)}</span>
+                                </div>
+                            </div>
+                        </div>`;
+                    }
+                }
+
+                html += '</div>';
+
+                if (!hasInterfaces) {
+                    document.getElementById('traffic-content').innerHTML = '<p class="loading">No interfaces found</p>';
+                } else {
+                    document.getElementById('traffic-content').innerHTML = html;
+                }
+            } catch (e) {
+                document.getElementById('traffic-content').innerHTML = `<p class="error">Error: ${e.message}</p>`;
+            }
+        }
+
+        async function fetchServices() {
+            try {
+                const response = await fetch('/api/haproxy/services');
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('services-content').innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                    return;
+                }
+
+                const servers = Array.isArray(data)
+                    ? data.filter(item => item && item.type === '2')
+                    : [];
+
+                if (servers.length === 0) {
+                    document.getElementById('services-content').innerHTML = '<p class="loading">No services found</p>';
+                    return;
+                }
+
+                let html = `<table><tr>
+                    <th>Service</th>
+                    <th>Status</th>
+                    <th>Health</th>
+                    <th>Sessions</th>
+                    <th>Traffic</th>
+                    <th>Queue</th>
+                    <th>Errors+Retries</th>
+                    <th>Avg RT</th>
+                    <th>Uptime</th>
+                </tr>`;
+
+                for (const svc of servers) {
+                    const name = svc.pxname || '-';
+                    const status = (svc.status || '').toLowerCase();
+                    const checkStatus = svc.check_status || '';
+
+                    let statusClass = 'status-down';
+                    let statusText = 'Down';
+                    let healthBadge = '';
+                    let statusBadge = '';
+
+                    if (status === 'up') {
+                        statusClass = 'status-up';
+                        statusText = 'Up';
+                        statusBadge = `<span class="health-badge health-up">${statusText}</span>`;
+                        healthBadge = checkStatus
+                            ? `<span class="health-badge health-up">${checkStatus}</span>`
+                            : '<span class="health-badge health-up">OK</span>';
+                    } else if (status === 'down') {
+                        statusClass = 'status-down';
+                        statusText = 'Down';
+                        statusBadge = `<span class="health-badge health-down">${statusText}</span>`;
+                        healthBadge = checkStatus
+                            ? `<span class="health-badge health-down">${checkStatus}</span>`
+                            : '<span class="health-badge health-down">Down</span>';
+                    } else if (status === 'no check') {
+                        statusClass = 'status-up';
+                        statusText = 'Up';
+                        statusBadge = `<span class="health-badge health-up">${statusText}</span>`;
+                        healthBadge = '<span class="health-badge health-nocheck">No Check</span>';
+                    } else {
+                        statusClass = 'status-warning';
+                        statusText = status.charAt(0).toUpperCase() + status.slice(1);
+                        statusBadge = `<span class="health-badge health-nocheck">${statusText}</span>`;
+                        healthBadge = checkStatus
+                            ? `<span class="health-badge health-nocheck">${checkStatus}</span>`
+                            : '-';
+                    }
+
+                    const scur = formatNumber(svc.scur);
+                    const smax = formatNumber(svc.smax);
+                    const rate = formatNumber(svc.rate);
+                    const sessions = scur && smax ? `${scur}/${smax} @ ${rate}/s` : '-';
+
+                    const bin = formatBytes(parseInt(svc.bin) || 0);
+                    const bout = formatBytes(parseInt(svc.bout) || 0);
+                    const traffic = bin && bout ? `↓${bin} ↑${bout}` : '-';
+
+                    const qcur = formatNumber(svc.qcur);
+                    const qmax = formatNumber(svc.qmax);
+                    const queue = (qcur !== '-' || qmax !== '-') ? `${qcur}/${qmax}` : '0/0';
+
+                    const econ = parseInt(svc.econ) || 0;
+                    const eresp = parseInt(svc.eresp) || 0;
+                    const wretr = parseInt(svc.wretr) || 0;
+                    const wredis = parseInt(svc.wredis) || 0;
+                    const errRetries = econ || eresp || wretr || wredis
+                        ? `${econ} err, ${wretr} retr, ${wredis} redisp`
+                        : '0';
+
+                    const ttime = svc.ttime ? `${parseFloat(svc.ttime).toFixed(0)}ms` : '-';
+                    const uptime = formatUptime(svc.lastchg);
+
+                    html += `<tr>
+                        <td><strong>${name}</strong></td>
+                        <td>${statusBadge}</td>
+                        <td>${healthBadge}</td>
+                        <td>${sessions}</td>
+                        <td>${traffic}</td>
+                        <td>${queue}</td>
+                        <td>${errRetries}</td>
+                        <td>${ttime}</td>
+                        <td>${uptime}</td>
+                    </tr>`;
+                }
+
+                html += '</table>';
+                document.getElementById('services-content').innerHTML = html;
+            } catch (e) {
+                document.getElementById('services-content').innerHTML = `<p class="error">Error: ${e.message}</p>`;
+            }
+        }
+
+        function fetchAll() {
+            fetchGateways();
+            fetchTraffic();
+            fetchServices();
+        }
+
+        function startRefreshTimer() {
+            if (refreshTimer) clearInterval(refreshTimer);
+            fetchAll();
+            refreshTimer = setInterval(fetchAll, REFRESH_INTERVAL * 1000);
+        }
+
+        async function fetchTrafficHistory(resolution) {
+            try {
+                const response = await fetch(`/api/traffic/history?range=${resolution}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('History fetch error:', data.error);
+                    return;
+                }
+
+                const interfaces = data.interfaces || {};
+
+                const firstIface = Object.keys(interfaces)[0];
+                const firstDir = interfaces[firstIface]?.in || [];
+                const totalPoints = firstDir.length;
+
+                historyTimestamps = firstDir;
+
+                const desiredLabels = 12;
+                const labelInterval = Math.max(1, Math.floor(totalPoints / desiredLabels));
+
+                const labels = firstDir.map((v, i) => {
+                    if (i % labelInterval === 0) {
+                        return new Date(v.t).toLocaleString();
+                    }
+                    return '';
+                });
+
+                historyChart.data.labels = labels;
+
+                historyChart.data.datasets.forEach(dataset => {
+                    const key = dataset.key;
+                    const direction = dataset.direction;
+                    const inValues = interfaces[key]?.in || [];
+                    const outValues = interfaces[key]?.out || [];
+
+                    dataset.data = direction === 'in'
+                        ? inValues.map(v => v.v)
+                        : outValues.map(v => -v.v);
+                });
+
+                historyChart.update('none');
+            } catch (e) {
+                console.error('History fetch error:', e);
+            }
+        }
+
+        function setupTimeRangeButtons() {
+            document.querySelectorAll('.time-range-selector button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.time-range-selector button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    fetchTrafficHistory(btn.dataset.range);
+                });
+            });
+
+            document.querySelector('.time-range-selector button[data-range="1"]').classList.add('active');
+        }
+
+        initChart();
+        initHistoryChart();
+        setupTimeRangeButtons();
+        fetchTrafficHistory('1');
+        startPolling();
+        startRefreshTimer();
+    </script>
+</body>
+</html>
