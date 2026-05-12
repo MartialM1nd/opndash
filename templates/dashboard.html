@@ -43,7 +43,11 @@
         }
         .card-gateways { flex: 1 1 280px; }
         .card-interfaces { flex: 1 1 280px; }
-        .card-services { flex: 2 1 400px; }
+        .card-services { 
+            flex: 2 1 400px; 
+            overflow-y: auto;
+            max-height: 400px;
+        }
         .card-full { 
             flex-basis: 100%; 
             min-width: 0;
@@ -260,6 +264,9 @@
             }
             .card, .card-gateways, .card-interfaces, .card-services, .card-full {
                 flex-basis: 100%;
+            }
+            .card-services {
+                max-height: 250px;
             }
         }
         @media (max-width: 450px) {
