@@ -26,7 +26,7 @@
         }
         h1 { color: #00d4ff; }
         .last-update { color: #888; font-size: 12px; }
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
+        .grid { display: grid; grid-template-columns: 20% 20% 60%; gap: 20px; align-items: start; }
         .card {
             background: #16213e;
             border-radius: 10px;
@@ -211,26 +211,6 @@
         #historyChart { height: 250px; }
         @media (max-width: 768px) {
             #services-content table { overflow-x: auto; display: block; }
-        }
-        @media (max-width: 1100px) {
-            body { max-width: 100vw; overflow-x: hidden; }
-            .grid { 
-                grid-template-columns: 20% 20% 60%; 
-                gap: 15px;
-                max-width: 100%;
-                overflow-x: hidden;
-            }
-            .card { 
-                max-width: 100%; 
-                overflow: hidden;
-                box-sizing: border-box;
-            }
-            .gateways-grid { grid-template-columns: 1fr; }
-            .interfaces-grid { grid-template-columns: 1fr; }
-            #services-content { overflow-x: auto; max-width: 100%; }
-            #services-content table { min-width: 500px; }
-            .chart-container { overflow-x: auto; max-width: 100%; }
-            #trafficChart, #historyChart { min-width: 500px; }
         }
         @media (max-width: 600px) {
             body { padding: 12px; }
